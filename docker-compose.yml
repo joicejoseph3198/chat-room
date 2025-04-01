@@ -1,0 +1,24 @@
+version: '3.9'
+
+services:
+  chatroom:
+    container_name: chat-app
+    build: ./
+    mem_limit: 512M
+    depends_on:
+      - redis
+    ports:
+      - "8080:8080"
+  redis:
+    image: redis:latest
+    restart: always
+    container_name: redis_chat
+    mem_limit: 512m
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis-chat-data:/data/redis-chat-data
+
+volumes:
+  redis-chat-data:
+

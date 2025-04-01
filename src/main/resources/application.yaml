@@ -1,0 +1,14 @@
+spring.application.name: chatroom
+
+redis:
+  host: localhost
+  port: 6379
+
+server:
+  servlet:
+    context-path: /api/chatapp
+
+spring:
+  web:
+    cors:
+      allow-credentials: false
