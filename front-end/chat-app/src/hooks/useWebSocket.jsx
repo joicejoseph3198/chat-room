@@ -1,47 +1,75 @@
 
-import { useEffect, useState } from 'react';
+import {useEffect, useRef, useState } from 'react';
 import sockjs from "sockjs-client/dist/sockjs"
 import { Stomp } from "@stomp/stompjs";
 
-
-const useWebSocket = (url, roomId, onMessageReceived) => {
-  const [stompClient, setStompClient] = useState(null);
+const useWebSocket = (url, roomId, currentUser, onMessageReceived) => {
+  const stompClientRef = useRef(null);
+  const subscriptionRef = useRef(null);
   const [connected, setConnected] = useState(false);
+  const connectionAttemptRef = useRef(0);
 
   useEffect(() => {
-    
+    // Skip if already connected or missing required params
+    if (!url || !roomId || !currentUser) return;
+
+    // Clear previous connection if exists
+    if (subscriptionRef.current) {
+      subscriptionRef.current.unsubscribe();
+      subscriptionRef.current = null;
+    }
+
+    if (stompClientRef.current) {
+      stompClientRef.current.deactivate();
+      stompClientRef.current = null;
+    }
+
+    // Create new connection
     const socket = new sockjs(url);
     const client = Stomp.over(socket);
+    stompClientRef.current = client;
 
     client.connect({}, () => {
-      console.log("Connected to WebSocket server");
+      connectionAttemptRef.current = 0;
       setConnected(true);
-      setStompClient(client); 
-      
-      client.subscribe(`/topic/chatroom/${roomId}`, (message) => {
-        const parsedMessage = JSON.parse(message.body);
-        console.log("New Message: ", parsedMessage.message);
-        if (onMessageReceived) onMessageReceived(parsedMessage); 
-      });
-    }, (frame) => {
-      console.error("STOMP Error:", frame);
+
+      // Only subscribe if not already subscribed
+      if (!subscriptionRef.current) {
+        subscriptionRef.current = client.subscribe(
+          `/topic/chatroom/${roomId}`,
+          (message) => {
+            try {
+              const parsedMessage = JSON.parse(message.body);
+              onMessageReceived(parsedMessage);
+            } catch (error) {
+              console.error('Message parsing error:', error);
+            }
+          }
+        );
+      }
+    }, (error) => {
+      console.error('Connection error:', error);
+      setConnected(false);
     });
 
     return () => {
-      console.log("Cleaning up WebSocket...");
-      client.disconnect(() => {
-        console.log("Disconnected from WebSocket server");
-        setConnected(false);
-        setStompClient(null);
-      });
+      if (subscriptionRef.current) {
+        subscriptionRef.current.unsubscribe();
+        subscriptionRef.current = null;
+      }
+
+      if (stompClientRef.current) {
+        stompClientRef.current.deactivate();
+        stompClientRef.current = null;
+      }
+
+      setConnected(false);
     };
-  }, [url, roomId]); 
+  }, [url, roomId, currentUser]);
 
   const sendMessage = (destination, message) => {
-    if (stompClient && stompClient.connected) {
-      stompClient.send(destination, {}, JSON.stringify(message));
-    } else {
-      console.error("WebSocket client not connected");
+    if (stompClientRef.current && stompClientRef.current.connected) {
+      stompClientRef.current.send(destination, {}, JSON.stringify(message));
     }
   };
 

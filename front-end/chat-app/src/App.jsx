@@ -1,38 +1,35 @@
-import { useState } from 'react';
+import { Provider } from 'react-redux'
 import './App.css'
-import useWebSocket from './hooks/useWebSocket'
+import { AxiosProvider } from './util/axiosUtil'
+import { store } from './redux/store'
+import { router } from './util/router'
+import { RouterProvider } from 'react-router'
+import { Bounce, ToastContainer } from 'react-toastify'
+
 
 function App() {
-  const [message, setMessage] = useState('');
-  const roomId = 'general';
-
-  const {connected, sendMessage } = useWebSocket("http://localhost:8080/api/chatapp/ws","general")
-
-  const handleSendMessage = () => {
-    if (message.trim()) {
-      sendMessage(`/ws/chat/${roomId}`, {
-        participant: "general_user",
-        message: message,
-        timestamp: Date.now(),
-        type: "CHAT"
-      });
-      setMessage(''); // Clear input
-    }
-  };
-
-  return (
-    <>
-        <p>ChatApp</p>
-
-        <input
-        type="text"
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
-        placeholder="Type a message..."
-       />
-      <button onClick={handleSendMessage}>Send</button>
-    </>
+  return(
+   
+      <AxiosProvider>
+        <Provider store={store}>
+        <ToastContainer
+          position="top-right"
+          autoClose={5000}
+          hideProgressBar={true}
+          newestOnTop={true}
+          closeOnClick={true}
+          rtl={false}
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+          theme="dark"
+          transition={Bounce}
+        />
+         <RouterProvider router={router}/>
+        </Provider>
+      </AxiosProvider>
   )
+ 
 }
 
 export default App
