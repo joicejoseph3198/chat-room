@@ -17,7 +17,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         // Prefix for messages from clients to the application
         // If removed, clients will need to send messages directly to a broadcast topic
         // This skips the controller layer, meaning we can’t process or store messages before broadcasting.
-        // Will redirect messages to controllers handling endpoints : `${servlet-context}`/chatroom/
+        // Will redirect messages to controllers handling endpoints : /ws
         config.setApplicationDestinationPrefixes("/ws");
     }
 
