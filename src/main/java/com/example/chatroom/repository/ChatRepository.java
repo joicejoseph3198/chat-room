@@ -7,5 +7,5 @@ import java.util.List;
 
 public interface ChatRepository {
     void updateChatHistory(final MessageRequestDTO messageRequestDTO, final String chatRoomName);
-    List<MessageDTO> fetchChatHistory(final int count, final String chatRoomName);
+    List<MessageDTO> fetchChatHistory(final int limit, final int offset, final String chatRoomName);
 }

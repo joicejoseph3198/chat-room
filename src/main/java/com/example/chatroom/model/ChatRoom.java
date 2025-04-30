@@ -7,7 +7,8 @@ import lombok.*;
 @NoArgsConstructor
 @Builder
 public class ChatRoom {
-    private String name; // used as key for hash
+    private String name;
     private String owner;
+    private String description;
     private long timestamp;
 }

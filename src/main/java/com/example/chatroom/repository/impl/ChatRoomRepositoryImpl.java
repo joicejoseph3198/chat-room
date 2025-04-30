@@ -7,10 +7,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Component
 public class ChatRoomRepositoryImpl implements ChatRoomRepository {
@@ -44,7 +47,10 @@ public class ChatRoomRepositoryImpl implements ChatRoomRepository {
         if(!CollectionUtils.isEmpty(hashEntries)){
             return hashEntries.values().stream()
                     .map(obj -> objectMapper.convertValue(obj, ChatRoom.class))
-                    .toList();
+                    .map(chatRoom -> {
+                        chatRoom.setName(chatRoom.getName().toUpperCase());
+                        return chatRoom;
+                    }).toList();
         }
         return List.of();
     }
@@ -56,13 +62,55 @@ public class ChatRoomRepositoryImpl implements ChatRoomRepository {
     }
 
     @Override
-    public void addParticipant(String chatRoomName, String participantName) {
+    public boolean addParticipant(String chatRoomName, String participantName) {
         if(Boolean.FALSE.equals(redisTemplate.opsForSet().isMember("PARTICIPANTS:" + chatRoomName, participantName))){
             redisTemplate.opsForSet().add("PARTICIPANTS:" + chatRoomName, participantName);
+            return Boolean.TRUE;
+        }
+        return Boolean.FALSE;
+    }
+
+    @Override
+    public boolean removeParticipant(String chatRoomName, String participantName) {
+        if(Boolean.TRUE.equals(redisTemplate.opsForSet().isMember("PARTICIPANTS:" + chatRoomName, participantName))){
+            redisTemplate.opsForSet().remove("PARTICIPANTS:" + chatRoomName, participantName);
+            return Boolean.TRUE;
+        }
+        return Boolean.FALSE;
+    }
+
+    @Override
+    public Set<String> getAllParticipants(String chatRoomName){
+        Set<Object> entries = redisTemplate.opsForSet().members("PARTICIPANTS:" + chatRoomName);
+        if(!CollectionUtils.isEmpty(entries)){
+            return entries.stream()
+                    .map(obj -> objectMapper.convertValue(obj, String.class))
+                    .map(String::toUpperCase)
+                    .collect(Collectors.toSet());
+        }
+        return Set.of();
+    }
+
+    public void addActiveChatRoom(String chatRoomName, String participantName) {
+        if(Boolean.FALSE.equals(redisTemplate.opsForSet().isMember("ACTIVE_CHAT_ROOM:" + participantName, chatRoomName))){
+            redisTemplate.opsForSet().add("ACTIVE_CHAT_ROOM:" + participantName, chatRoomName);
         }
     }
 
-    public void removeParticipant(String chatRoomName, String participantName) {
-        redisTemplate.opsForSet().remove("PARTICIPANTS:" + chatRoomName, participantName);
+    public void removeActiveChatRoom(String chatRoomName, String participantName) {
+        if(Boolean.TRUE.equals(redisTemplate.opsForSet().isMember("ACTIVE_CHAT_ROOM:" + participantName, chatRoomName))){
+            redisTemplate.opsForSet().remove("ACTIVE_CHAT_ROOM:" + participantName, chatRoomName);
+        }
+    }
+
+    public Set<String> getAllActiveChatRooms(String participantName){
+        Set<Object> entries = redisTemplate.opsForSet().members("ACTIVE_CHAT_ROOM:" + participantName);
+        if(!CollectionUtils.isEmpty(entries)){
+            return entries.stream()
+                    .map(obj -> objectMapper.convertValue(obj, String.class))
+                    .map(String::toUpperCase)
+                    .collect(Collectors.toSet());
+        }
+        return Set.of();
     }
 }

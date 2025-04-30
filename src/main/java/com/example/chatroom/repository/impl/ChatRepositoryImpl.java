@@ -8,7 +8,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
+
+import java.util.LinkedList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Component
 public class ChatRepositoryImpl implements ChatRepository {
@@ -24,18 +27,16 @@ public class ChatRepositoryImpl implements ChatRepository {
 
     @Override
     public void updateChatHistory(final MessageRequestDTO messageRequestDTO, String chatRoomName) {
-        if(messageRequestDTO.type().equals(MessageType.CHAT)){
-            MessageDTO message = new MessageDTO(messageRequestDTO.participant(), messageRequestDTO.message(), messageRequestDTO.timestamp());
-            redisTemplate.opsForList().rightPush("CHAT_HISTORY:"+ chatRoomName.toLowerCase(), message);
-        }
+        MessageDTO message = new MessageDTO(messageRequestDTO.participant(), messageRequestDTO.message(), messageRequestDTO.timestamp(), messageRequestDTO.type());
+        redisTemplate.opsForList().rightPush("CHAT_HISTORY:"+ chatRoomName.toLowerCase(), message);
     }
 
     @Override
-    public List<MessageDTO> fetchChatHistory(final int count, String chatRoomName) {
-        List<Object> chatHistory = redisTemplate.opsForList().range("CHAT_HISTORY:"+chatRoomName.toLowerCase(), -count,-1);
+    public List<MessageDTO> fetchChatHistory(final int limit, final int offset, String chatRoomName) {
+        List<Object> chatHistory = redisTemplate.opsForList().range("CHAT_HISTORY:"+chatRoomName.toLowerCase(), -(limit + offset),-(1 + offset));
         if(CollectionUtils.isEmpty(chatHistory)){
             return List.of();
         }
-        return chatHistory.stream().map(message -> objectMapper.convertValue(message, MessageDTO.class)).toList();
+        return chatHistory.stream().map(message -> objectMapper.convertValue(message, MessageDTO.class)).collect(Collectors.toCollection(LinkedList::new));
     }
 }

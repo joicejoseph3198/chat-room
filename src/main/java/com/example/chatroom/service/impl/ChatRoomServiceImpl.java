@@ -5,6 +5,7 @@ import com.example.chatroom.dto.ChatRoomResponseDTO;
 import com.example.chatroom.dto.MessageRequestDTO;
 import com.example.chatroom.enums.MessageType;
 import com.example.chatroom.model.ChatRoom;
+import com.example.chatroom.repository.ChatRepository;
 import com.example.chatroom.repository.ChatRoomRepository;
 import com.example.chatroom.service.ChatRoomService;
 import lombok.extern.slf4j.Slf4j;
@@ -13,6 +14,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 @Slf4j
@@ -20,11 +22,13 @@ public class ChatRoomServiceImpl implements ChatRoomService {
 
     private final ChatRoomRepository chatRoomRepository;
     private final RedisTemplate<String,Object> redisTemplate;
+    private final ChatRepository messageRepository;
 
     @Autowired
-    public ChatRoomServiceImpl(ChatRoomRepository chatRoomRepository, RedisTemplate<String, Object> redisTemplate) {
+    public ChatRoomServiceImpl(ChatRoomRepository chatRoomRepository, RedisTemplate<String, Object> redisTemplate, ChatRepository messageRepository) {
         this.chatRoomRepository = chatRoomRepository;
         this.redisTemplate = redisTemplate;
+        this.messageRepository = messageRepository;
     }
 
 
@@ -39,6 +43,7 @@ public class ChatRoomServiceImpl implements ChatRoomService {
             ChatRoom newEntry =
                     ChatRoom.builder()
                             .name(requestDTO.name().toLowerCase())
+                            .description(requestDTO.description())
                             .owner(requestDTO.owner())
                             .timestamp(System.currentTimeMillis())
                     .build();
@@ -70,9 +75,14 @@ public class ChatRoomServiceImpl implements ChatRoomService {
             log.info("Failed to connect participant to chat room | Participant: {} | Chat Room : {}  ", participant, chatRoomName.toLowerCase());
             return new ChatRoomResponseDTO<>(null, "Given chat room could not be found", "unsuccessful", null);
         }
-        chatRoomRepository.addParticipant(chatRoomName.toLowerCase(),participant);
-        MessageRequestDTO generatedMessage = new MessageRequestDTO(participant,String.format("`%s` has joined the chat room", participant),System.currentTimeMillis(), MessageType.JOINED);
-        redisTemplate.convertAndSend("CHATROOM:"+chatRoomName, generatedMessage);
+        boolean newEntryCreated = chatRoomRepository.addParticipant(chatRoomName.toLowerCase(), participant);
+        if(Boolean.TRUE.equals(newEntryCreated)){
+            MessageRequestDTO generatedMessage = new MessageRequestDTO(participant,String.format("`%s` has joined the chat room", participant),System.currentTimeMillis(), MessageType.JOINED);
+            redisTemplate.convertAndSend("CHATROOM:"+chatRoomName, generatedMessage);
+            messageRepository.updateChatHistory(generatedMessage,chatRoomName);
+            chatRoomRepository.addActiveChatRoom(chatRoomName, participant);
+
+        }
         log.info("Successfully connected participant to chat room | Participant: `{}` | Chat Room : `{}`  ", participant, chatRoomName.toLowerCase());
         return new ChatRoomResponseDTO<>(null, "Participant '" + participant +"' joined chat room '" + chatRoomName +"'.", "success", null);
     }
@@ -85,10 +95,19 @@ public class ChatRoomServiceImpl implements ChatRoomService {
             log.info("Non existent chat room | Participant: {} | Chat Room : {}  ", participant, chatRoomName.toLowerCase());
             return new ChatRoomResponseDTO<>(null, "Given chat room could not be found", "unsuccessful", null);
         }
-        chatRoomRepository.removeParticipant(chatRoomName.toLowerCase(),participant);
-        MessageRequestDTO generatedMessage = new MessageRequestDTO(participant,String.format("`%s` has left the chat room", participant),System.currentTimeMillis(), MessageType.LEFT);
-        redisTemplate.convertAndSend("CHATROOM:"+chatRoomName, generatedMessage);
+        boolean entryDeleted = chatRoomRepository.removeParticipant(chatRoomName.toLowerCase(),participant);
+        if(Boolean.TRUE.equals(entryDeleted)){
+            MessageRequestDTO generatedMessage = new MessageRequestDTO(participant,String.format("`%s` has left the chat room", participant),System.currentTimeMillis(), MessageType.LEFT);
+            redisTemplate.convertAndSend("CHATROOM:"+chatRoomName, generatedMessage);
+            messageRepository.updateChatHistory(generatedMessage,chatRoomName);
+            chatRoomRepository.removeActiveChatRoom(chatRoomName, participant);
+        }
         log.info("Successfully exited chat room | Participant: `{}` | Chat Room : `{}`  ", participant, chatRoomName.toLowerCase());
         return new ChatRoomResponseDTO<>(null, "Participant '" + participant +"' joined chat room '" + chatRoomName +"'.", "success", null);
+    }
+
+    @Override
+    public ChatRoomResponseDTO<Set<String>> getActiveChatRoomListing(String participant) {
+        return new ChatRoomResponseDTO<>(null,"Active chat rooms","success", chatRoomRepository.getAllActiveChatRooms(participant));
     }
 }

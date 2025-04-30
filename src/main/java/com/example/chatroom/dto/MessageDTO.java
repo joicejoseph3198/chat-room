@@ -1,4 +1,6 @@
 package com.example.chatroom.dto;
 
-public record MessageDTO(String participant, String message, Long timestamp) {
+import com.example.chatroom.enums.MessageType;
+
+public record MessageDTO(String participant, String message, Long timestamp, MessageType type) {
 }
