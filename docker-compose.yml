@@ -18,7 +18,6 @@ services:
       - '6379:6379'
     volumes:
       - redis-chat-data:/data/redis-chat-data
-
 volumes:
   redis-chat-data:
 
